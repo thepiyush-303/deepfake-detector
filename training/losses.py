@@ -11,7 +11,8 @@ class LabelSmoothedBCELoss(nn.Module):
     """
     Label smoothed Binary Cross Entropy Loss.
     
-    Formula: y_smooth = y * (1 - epsilon) + (1 - y) * epsilon / 2
+    Formula: y_smooth = y * (1 - epsilon) + epsilon / 2
+    This gives: 0 -> epsilon/2, 1 -> (1 - epsilon/2)
     
     Args:
         epsilon: Label smoothing factor (default: 0.1)
@@ -122,8 +123,8 @@ class CenterLoss(nn.Module):
         self.feat_dim = feat_dim
         self.device = device
         
-        # Initialize centers with zeros
-        self.centers = nn.Parameter(torch.randn(num_classes, feat_dim).to(device))
+        # Initialize centers with zeros (will be moved to device via .to())
+        self.centers = nn.Parameter(torch.randn(num_classes, feat_dim))
         self.centers.requires_grad = True
     
     def forward(self, features, targets):

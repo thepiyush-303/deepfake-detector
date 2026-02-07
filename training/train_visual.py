@@ -253,25 +253,21 @@ class VisualTrainer:
                 binary_labels_gpu = binary_labels.to(self.device)
                 gan_types = gan_types.to(self.device)
                 
-                # Forward pass (with probabilities for evaluation)
-                binary_logits, gan_type_logits, features_dict = self.model(rgb, spectrum, noise, return_probs=True)
-                
-                # Binary predictions (already sigmoid activated)
-                binary_preds = binary_logits.squeeze().cpu().numpy()
-                
-                # Convert back to logits for loss computation
-                binary_logits_loss = torch.logit(binary_logits.clamp(1e-7, 1-1e-7))
-                gan_type_logits_loss = torch.log(gan_type_logits.clamp(1e-7, 1.0))
+                # Forward pass with raw logits for loss
+                binary_logits, gan_type_logits, features_dict = self.model(rgb, spectrum, noise)
                 
                 # Compute loss
                 loss_dict = self.criterion(
-                    binary_logits_loss,
-                    gan_type_logits_loss,
+                    binary_logits,
+                    gan_type_logits,
                     features_dict['fused'],
                     binary_labels_gpu,
                     gan_types
                 )
                 val_loss += loss_dict['total'].item()
+                
+                # Get predictions by applying sigmoid
+                binary_preds = torch.sigmoid(binary_logits).squeeze().cpu().numpy()
                 
                 all_binary_preds.extend(binary_preds if binary_preds.ndim > 0 else [binary_preds.item()])
                 all_binary_labels.extend(binary_labels.numpy())

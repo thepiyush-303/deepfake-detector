@@ -209,25 +209,21 @@ class AudioTrainer:
                 binary_labels_expanded = binary_labels.unsqueeze(1).expand(-1, num_segments).reshape(-1).to(self.device)
                 vocoder_types_expanded = vocoder_types.unsqueeze(1).expand(-1, num_segments).reshape(-1).to(self.device)
                 
-                # Forward pass (with probabilities for evaluation)
-                binary_logits, vocoder_type_logits, fusion_features = self.model(mel_features, lfcc_features, return_probs=True)
-                
-                # Binary predictions (already sigmoid activated) - average over segments
-                binary_preds = binary_logits.squeeze().view(batch_size, num_segments).mean(dim=1).cpu().numpy()
-                
-                # Convert back to logits for loss computation
-                binary_logits_loss = torch.logit(binary_logits.clamp(1e-7, 1-1e-7))
-                vocoder_type_logits_loss = torch.log(vocoder_type_logits.clamp(1e-7, 1.0))
+                # Forward pass with raw logits for loss
+                binary_logits, vocoder_type_logits, fusion_features = self.model(mel_features, lfcc_features)
                 
                 # Compute loss
                 loss_dict = self.criterion(
-                    binary_logits_loss,
-                    vocoder_type_logits_loss,
+                    binary_logits,
+                    vocoder_type_logits,
                     fusion_features,
                     binary_labels_expanded,
                     vocoder_types_expanded
                 )
                 val_loss += loss_dict['total'].item()
+                
+                # Get predictions by applying sigmoid and averaging over segments
+                binary_preds = torch.sigmoid(binary_logits).squeeze().view(batch_size, num_segments).mean(dim=1).cpu().numpy()
                 
                 all_binary_preds.extend(binary_preds)
                 all_binary_labels.extend(binary_labels.numpy())
