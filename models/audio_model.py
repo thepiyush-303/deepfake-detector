@@ -200,12 +200,16 @@ class AudioDeepfakeModel(nn.Module):
         )
         
         # Binary classification head: P(fake_audio)
+        # Note: Sigmoid is included as per architecture spec. For training,
+        # consider using BCEWithLogitsLoss and removing this activation.
         self.binary_head = nn.Sequential(
             nn.Linear(64, 1),
             nn.Sigmoid()
         )
         
         # Vocoder type classification head (7 classes)
+        # Note: Softmax is included as per architecture spec. For training,
+        # consider using CrossEntropyLoss and removing this activation.
         self.vocoder_type_head = nn.Sequential(
             nn.Linear(64, 7),
             nn.Softmax(dim=1)

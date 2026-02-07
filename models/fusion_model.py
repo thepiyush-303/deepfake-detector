@@ -49,12 +49,16 @@ class DeepfakeFusionModel(nn.Module):
         )
         
         # Binary classification head: P(fake)
+        # Note: Sigmoid is included as per architecture spec. For training,
+        # consider using BCEWithLogitsLoss and removing this activation.
         self.binary_head = nn.Sequential(
             nn.Linear(128, 1),
             nn.Sigmoid()
         )
         
         # GAN type classification head (7 classes)
+        # Note: Softmax is included as per architecture spec. For training,
+        # consider using CrossEntropyLoss and removing this activation.
         self.gan_type_head = nn.Sequential(
             nn.Linear(128, 7),
             nn.Softmax(dim=1)
