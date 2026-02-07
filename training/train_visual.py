@@ -366,6 +366,97 @@ class VisualTrainer:
         return checkpoint
 
 
+def load_visual_dataset_from_directory(data_dir):
+    """
+    Load visual dataset from directory structure.
+    
+    Expected structure:
+    data_dir/
+    ├── real/
+    │   ├── img001.jpg
+    │   └── ...
+    ├── progan/
+    ├── stylegan/
+    ├── stargan/
+    ├── cyclegan/
+    ├── deepfakes/
+    └── unknown/
+    
+    Args:
+        data_dir: Path to dataset directory
+        
+    Returns:
+        tuple: (image_paths, labels, gan_types)
+    """
+    if not os.path.exists(data_dir):
+        raise ValueError(f"Data directory does not exist: {data_dir}")
+    
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+    image_paths = []
+    labels = []
+    gan_types = []
+    
+    # Mapping of GAN folder names to types
+    gan_map = {
+        'real': (0, 0),  # (label, gan_type)
+        'progan': (1, 1),
+        'stylegan': (1, 2),
+        'stargan': (1, 3),
+        'cyclegan': (1, 4),
+        'deepfakes': (1, 5),
+        'unknown': (1, 6),
+    }
+    
+    # Scan each expected folder
+    for root, _, files in os.walk(data_dir):
+        rel_path = os.path.relpath(root, data_dir)
+        folder_name = rel_path.split(os.sep)[0].lower() if rel_path != '.' else ''
+        
+        # Skip if not a direct subfolder
+        if os.sep in rel_path:
+            continue
+            
+        # Get label and GAN type
+        if folder_name in gan_map:
+            label, gan_type = gan_map[folder_name]
+        else:
+            # Unrecognized folder with images is treated as unknown fake
+            label, gan_type = 1, 6
+        
+        # Collect image files
+        for file in files:
+            if os.path.splitext(file)[1].lower() in image_extensions:
+                image_paths.append(os.path.join(root, file))
+                labels.append(label)
+                gan_types.append(gan_type)
+    
+    if len(image_paths) == 0:
+        raise ValueError(f"No image files found in {data_dir}. "
+                        f"Expected structure with subdirectories like 'real/', 'progan/', 'stylegan/', etc.")
+    
+    # Print statistics
+    num_real = sum(1 for l in labels if l == 0)
+    num_fake = sum(1 for l in labels if l == 1)
+    
+    print(f"\nDataset loaded from: {data_dir}")
+    print(f"Total samples: {len(image_paths)}")
+    print(f"  Real: {num_real} ({100*num_real/len(image_paths):.1f}%)")
+    print(f"  Fake: {num_fake} ({100*num_fake/len(image_paths):.1f}%)")
+    
+    # Count GAN types
+    gan_counts = {}
+    for gt in gan_types:
+        gan_counts[gt] = gan_counts.get(gt, 0) + 1
+    print(f"GAN type distribution:")
+    gan_names = {0: "Real", 1: "ProGAN", 2: "StyleGAN", 3: "StarGAN",
+                 4: "CycleGAN", 5: "Deepfakes", 6: "Unknown"}
+    for gt in sorted(gan_counts.keys()):
+        count = gan_counts[gt]
+        print(f"  {gan_names.get(gt, 'Unknown')}: {count} ({100*count/len(image_paths):.1f}%)")
+    
+    return image_paths, labels, gan_types
+
+
 def main():
     parser = argparse.ArgumentParser(description='Train visual deepfake detection model')
     parser.add_argument('--config', type=str, default='config/default.yaml',
@@ -376,7 +467,7 @@ def main():
                        help='Path to validation data')
     parser.add_argument('--resume', type=str, default=None,
                        help='Path to checkpoint to resume from')
-    parser.add_argument('--device', type=str, default='cuda',
+    parser.add_argument('--device', type=str, default='cpu',
                        help='Device to use (cuda/cpu)')
     
     args = parser.parse_args()
@@ -389,16 +480,30 @@ def main():
     device = args.device if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
     
-    # TODO: Load datasets (placeholder - implement based on data format)
-    # For now, create dummy loaders to show structure
-    print("Loading datasets...")
-    # train_dataset = DeepfakeImageDataset(train_paths, train_labels, train_gan_types)
-    # val_dataset = DeepfakeImageDataset(val_paths, val_labels, val_gan_types)
-    # train_loader = DataLoader(train_dataset, batch_size=config['training']['visual']['batch_size'], shuffle=True, num_workers=4)
-    # val_loader = DataLoader(val_dataset, batch_size=config['training']['visual']['batch_size'], shuffle=False, num_workers=4)
+    # Load datasets
+    print("\nLoading training dataset...")
+    train_paths, train_labels, train_gan_types = load_visual_dataset_from_directory(args.train_data)
     
-    print("Note: Dataset loading not implemented. Please implement data loading based on your data format.")
-    print("Expected format: image_paths, labels (0/1), gan_types (0-6)")
+    print("\nLoading validation dataset...")
+    val_paths, val_labels, val_gan_types = load_visual_dataset_from_directory(args.val_data)
+    
+    # Create datasets
+    train_dataset = DeepfakeImageDataset(train_paths, train_labels, train_gan_types)
+    val_dataset = DeepfakeImageDataset(val_paths, val_labels, val_gan_types)
+    
+    # Create data loaders
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config['training']['visual']['batch_size'],
+        shuffle=True,
+        num_workers=4
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config['training']['visual']['batch_size'],
+        shuffle=False,
+        num_workers=4
+    )
     
     # Initialize trainer
     trainer = VisualTrainer(config, device=device)
@@ -409,10 +514,10 @@ def main():
         trainer.load_checkpoint(args.resume)
     
     # Train Phase 1 (epochs 1-8)
-    # trainer.train_phase(train_loader, val_loader, phase=1)
+    trainer.train_phase(train_loader, val_loader, phase=1)
     
     # Train Phase 2 (epochs 9-20)
-    # trainer.train_phase(train_loader, val_loader, phase=2)
+    trainer.train_phase(train_loader, val_loader, phase=2)
     
     print("\nTraining completed!")
     print(f"Best validation AUC: {trainer.best_val_auc:.4f}")
