@@ -27,17 +27,19 @@ class FaceDetector:
         self.mtcnn = MTCNN(
             keep_all=True,
             device=self.device,
-            post_process=False
+            post_process=False,
+            min_face_size=20,
+            thresholds=[0.5, 0.6, 0.6]
         )
     
-    def detect_faces(self, image, conf_threshold=0.95, min_size=64, margin=0.3):
+    def detect_faces(self, image, conf_threshold=0.5, min_size=30, margin=0.3):
         """
         Detect faces in an image.
         
         Args:
             image: RGB image as numpy array, shape (H, W, 3)
-            conf_threshold: Minimum confidence threshold (default: 0.95)
-            min_size: Minimum face size in pixels (default: 64)
+            conf_threshold: Minimum confidence threshold (default: 0.5)
+            min_size: Minimum face size in pixels (default: 30)
             margin: Margin around detected face as fraction of face size (default: 0.3)
         
         Returns:
@@ -148,7 +150,7 @@ class FaceDetector:
         
         return aligned_face
     
-    def detect_and_align_batch(self, images, conf_threshold=0.95, min_size=64, margin=0.3):
+    def detect_and_align_batch(self, images, conf_threshold=0.5, min_size=30, margin=0.3):
         """
         Detect and align faces in a batch of images.
         
