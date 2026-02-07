@@ -227,6 +227,10 @@ def detect_video(video_file, progress=gr.Progress()):
         frames = list(range(len(result['per_frame_scores'])))
         scores = result['per_frame_scores']
         
+        # Ensure scores is a flat list of numbers (safety check for jagged arrays)
+        if scores and isinstance(scores[0], (list, np.ndarray)):
+            scores = [float(np.mean(s)) if len(s) > 0 else 0.5 for s in scores]
+        
         ax.plot(frames, scores, color='#4a9eff', linewidth=2, marker='o', markersize=4)
         ax.axhline(y=0.5, color='#ff4444', linestyle='--', linewidth=1, alpha=0.7, label='Threshold')
         ax.fill_between(frames, scores, 0.5, where=[s > 0.5 for s in scores], 

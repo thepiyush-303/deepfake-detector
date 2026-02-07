@@ -59,7 +59,7 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
     all_bboxes = []
     
     for frame in frames:
-        detection = face_detector.detect_faces(frame, conf_threshold=0.90, min_size=64, margin=0.2)
+        detection = face_detector.detect_faces(frame, conf_threshold=0.5, min_size=30, margin=0.2)
         all_detections.append(detection)
         all_bboxes.append(detection['boxes'])
     
@@ -140,7 +140,13 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
         median_score = np.median(track_scores_array)
         
         # Aggregate GAN probabilities
-        avg_gan_probs = np.mean(track_gan_probs, axis=0)
+        if len(track_gan_probs) > 0:
+            try:
+                avg_gan_probs = np.mean(np.stack(track_gan_probs), axis=0)
+            except ValueError:
+                avg_gan_probs = track_gan_probs[0]  # fallback to first
+        else:
+            avg_gan_probs = np.zeros(len(GAN_TYPES))
         gan_type_idx = np.argmax(avg_gan_probs)
         gan_type = GAN_TYPES[gan_type_idx]
         
@@ -219,7 +225,15 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
         mean_score = np.mean(frame_scores)
         std_score = np.std(frame_scores)
         median_score = np.median(frame_scores)
-        avg_gan_probs = np.mean(frame_gan_probs, axis=0)
+        
+        if len(frame_gan_probs) > 0:
+            try:
+                avg_gan_probs = np.mean(np.stack(frame_gan_probs), axis=0)
+            except ValueError:
+                avg_gan_probs = frame_gan_probs[0]  # fallback to first
+        else:
+            avg_gan_probs = np.zeros(len(GAN_TYPES))
+        
         gan_type_idx = np.argmax(avg_gan_probs)
         gan_type = GAN_TYPES[gan_type_idx]
         
@@ -298,9 +312,17 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
         warnings.warn(f"Could not save annotated video: {e}")
         annotated_video_path = None
     
+    # Convert per_frame_scores from list of lists to flat list of floats
+    per_frame_scores_flat = []
+    for frame_scores in per_frame_scores:
+        if len(frame_scores) > 0:
+            per_frame_scores_flat.append(float(np.mean(frame_scores)))
+        else:
+            per_frame_scores_flat.append(0.5)  # Default neutral score for frames with no faces
+    
     return {
         'faces': face_results,
-        'per_frame_scores': per_frame_scores,
+        'per_frame_scores': per_frame_scores_flat,
         'overall_verdict': overall_verdict,
         'overall_score': float(overall_mean),
         'confidence': confidence,
