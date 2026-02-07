@@ -89,8 +89,15 @@ def predict_image(image_path, model, device='cuda'):
     device = torch.device(device if torch.cuda.is_available() else 'cpu')
     
     # Preprocess image: detect face and align (with fallback to full image)
-    aligned_face = preprocess_image(image_path, target_size=256)
-    face_detected = True  # Default assumption
+    result_tuple = preprocess_image(image_path, target_size=256)
+    
+    # Handle both old (single value) and new (tuple) return formats for compatibility
+    if isinstance(result_tuple, tuple):
+        aligned_face, face_detected = result_tuple
+    else:
+        # Old format for compatibility
+        aligned_face = result_tuple
+        face_detected = aligned_face is not None
     
     if aligned_face is None:
         # Last resort fallback: load image directly and center-crop

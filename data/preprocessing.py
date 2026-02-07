@@ -28,8 +28,10 @@ def preprocess_image(image_path, target_size=256):
         target_size: Target size for output (default: 256)
     
     Returns:
-        Aligned and resized face image as RGB numpy array (H, W, 3)
-        Returns center-cropped full image if no face detected
+        Tuple of (aligned_face, face_detected):
+        - aligned_face: Aligned and resized face image as RGB numpy array (H, W, 3)
+                       or center-cropped full image if no face detected
+        - face_detected: Boolean indicating if a face was detected
     """
     try:
         # Load image
@@ -58,7 +60,7 @@ def preprocess_image(image_path, target_size=256):
             if cropped_image.shape[0] != target_size or cropped_image.shape[1] != target_size:
                 cropped_image = cv2.resize(cropped_image, (target_size, target_size), interpolation=cv2.INTER_LINEAR)
             
-            return cropped_image
+            return cropped_image, False
         
         # Use the first detected face
         bbox = detection['boxes'][0]
@@ -71,11 +73,11 @@ def preprocess_image(image_path, target_size=256):
         if aligned_face.shape[0] != target_size or aligned_face.shape[1] != target_size:
             aligned_face = cv2.resize(aligned_face, (target_size, target_size), interpolation=cv2.INTER_LINEAR)
         
-        return aligned_face
+        return aligned_face, True
     
     except Exception as e:
         print(f"Error processing image {image_path}: {e}")
-        return None
+        return None, False
 
 
 def extract_fingerprints(image_rgb):
