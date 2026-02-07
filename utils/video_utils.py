@@ -114,8 +114,10 @@ def track_faces(frames, face_bboxes):
         # Convert any remaining tensors to lists
         clean_bboxes = []
         for bbox in bboxes:
+            # Handle PyTorch tensors
             if hasattr(bbox, 'cpu'):
                 bbox = bbox.cpu().detach().numpy().tolist()
+            # Handle numpy arrays
             elif hasattr(bbox, 'tolist'):
                 bbox = bbox if isinstance(bbox, list) else bbox.tolist()
             clean_bboxes.append(bbox)

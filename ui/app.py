@@ -25,6 +25,9 @@ from inference.explainability import generate_gradcam
 # Suppress warnings
 warnings.filterwarnings('ignore')
 
+# Constants
+DEFAULT_NO_FACE_SCORE = 0.5  # Default score for frames with no detected faces
+
 # Load configuration
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'default.yaml')
 
@@ -229,7 +232,7 @@ def detect_video(video_file, progress=gr.Progress()):
         
         # Ensure scores is a flat list of numbers (safety check for jagged arrays)
         if scores and isinstance(scores[0], (list, np.ndarray)):
-            scores = [float(np.mean(s)) if len(s) > 0 else 0.5 for s in scores]
+            scores = [float(np.mean(s)) if len(s) > 0 else DEFAULT_NO_FACE_SCORE for s in scores]
         
         ax.plot(frames, scores, color='#4a9eff', linewidth=2, marker='o', markersize=4)
         ax.axhline(y=0.5, color='#ff4444', linestyle='--', linewidth=1, alpha=0.7, label='Threshold')

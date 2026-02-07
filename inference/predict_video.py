@@ -18,6 +18,9 @@ from data.preprocessing import extract_fingerprints
 # GAN type classes
 GAN_TYPES = ['ProGAN', 'StyleGAN', 'StyleGAN2', 'BigGAN', 'CycleGAN', 'StarGAN', 'GauGAN']
 
+# Default score for frames with no detected faces
+DEFAULT_NO_FACE_SCORE = 0.5
+
 
 def predict_video(video_path, model, device='cuda', output_dir='output'):
     """
@@ -59,6 +62,8 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
     all_bboxes = []
     
     for frame in frames:
+        # Lowered threshold from 0.90 to 0.5 to detect more faces and reduce false negatives
+        # This matches the updated defaults in face_utils
         detection = face_detector.detect_faces(frame, conf_threshold=0.5, min_size=30, margin=0.2)
         all_detections.append(detection)
         all_bboxes.append(detection['boxes'])
@@ -143,7 +148,8 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
         if len(track_gan_probs) > 0:
             try:
                 avg_gan_probs = np.mean(np.stack(track_gan_probs), axis=0)
-            except ValueError:
+            except ValueError as e:
+                warnings.warn(f"Could not stack GAN probabilities for track {track_id}: {e}. Using first element as fallback.")
                 avg_gan_probs = track_gan_probs[0]  # fallback to first
         else:
             avg_gan_probs = np.zeros(len(GAN_TYPES))
@@ -229,7 +235,8 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
         if len(frame_gan_probs) > 0:
             try:
                 avg_gan_probs = np.mean(np.stack(frame_gan_probs), axis=0)
-            except ValueError:
+            except ValueError as e:
+                warnings.warn(f"Could not stack GAN probabilities for full-frame analysis: {e}. Using first element as fallback.")
                 avg_gan_probs = frame_gan_probs[0]  # fallback to first
         else:
             avg_gan_probs = np.zeros(len(GAN_TYPES))
@@ -318,7 +325,7 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
         if len(frame_scores) > 0:
             per_frame_scores_flat.append(float(np.mean(frame_scores)))
         else:
-            per_frame_scores_flat.append(0.5)  # Default neutral score for frames with no faces
+            per_frame_scores_flat.append(DEFAULT_NO_FACE_SCORE)  # Default neutral score for frames with no faces
     
     return {
         'faces': face_results,
