@@ -1,0 +1,171 @@
+# GAN Fingerprint-Based Deepfake Detector Configuration
+
+# Model Architecture
+model:
+  visual:
+    backbone: "efficientnet_b0"
+    input_size: 256
+    face_size: 224
+    spectral_channels: 2  # FFT + DCT
+    noise_channels: 30  # SRM filters
+    rgb_channels: 3
+    feature_dim: 1280  # EfficientNet-B0 output
+    fusion_dim: 3840  # 3 * 1280
+    hidden_dims: [512, 128]
+    dropout: [0.4, 0.3]
+    num_gan_types: 7
+    
+  audio:
+    backbone: "resnet18"
+    sample_rate: 16000
+    segment_duration: 4.0
+    hop_duration: 2.0
+    max_segments: 30
+    mel:
+      n_fft: 512
+      hop_length: 160
+      n_mels: 80
+      fmin: 0
+      fmax: 8000
+    lfcc:
+      n_filters: 70
+      n_lfcc: 40
+    feature_dim: 512  # ResNet-18 output
+    fusion_dim: 1024  # 2 * 512
+    hidden_dims: [256, 64]
+    dropout: 0.3
+    num_vocoder_types: 7
+
+# SRM Filters
+srm:
+  num_filters: 30
+  kernel_size: 5
+  learnable_combination: true
+
+# Training Configuration
+training:
+  visual:
+    phase1:
+      epochs: 8
+      lr_adapter: 1.0e-3
+      lr_head: 1.0e-3
+      warmup_epochs: 2
+      schedule: "cosine"
+      t_max: 8
+      eta_min: 1.0e-6
+    phase2:
+      epochs: 12
+      lr_backbone: 1.0e-4
+      lr_adapter_head: 5.0e-4
+      schedule: "cosine_restart"
+      t_0: 4
+      t_mult: 2
+      eta_min: 1.0e-7
+    batch_size: 16
+    gradient_accumulation: 4
+    effective_batch_size: 64
+    optimizer: "adamw"
+    weight_decay: 1.0e-4
+    gradient_clip: 1.0
+    mixed_precision: true
+    early_stopping_patience: 5
+    
+  audio:
+    epochs: 15
+    lr_backbone: 1.0e-4
+    lr_head: 1.0e-3
+    warmup_epochs: 1
+    batch_size: 32
+    gradient_accumulation: 2
+    effective_batch_size: 64
+    optimizer: "adamw"
+    weight_decay: 1.0e-4
+    gradient_clip: 1.0
+    schedule: "cosine"
+    t_max: 15
+    eta_min: 1.0e-7
+    early_stopping_patience: 4
+
+# Loss Function
+loss:
+  alpha: 1.0  # Binary loss weight
+  beta: 0.5   # GAN/vocoder type loss weight
+  gamma: 0.01 # Center loss weight
+  label_smoothing: 0.1
+
+# Data Augmentation
+augmentation:
+  visual:
+    horizontal_flip: 0.5
+    random_crop: 0.3
+    jpeg_compression: 0.2
+    jpeg_quality: [85, 100]
+    random_erasing: 0.1
+    erasing_scale: [0.02, 0.15]
+  audio:
+    time_masking: 0.3
+    time_mask_max: 20
+    random_gain: 0.2
+    gain_range: [0.8, 1.2]
+
+# Face Detection
+face_detection:
+  method: "mtcnn"
+  confidence_threshold: 0.95
+  min_face_size: 64
+  margin: 0.3
+  alignment: true
+  landmark_points: 5
+
+# Video Processing
+video:
+  target_fps: 1
+  min_frames: 8
+  max_frames: 32
+  batch_size: 16
+  tracking:
+    iou_threshold: 0.3
+  consistency:
+    stable_threshold: 0.10
+    moderate_threshold: 0.25
+  confidence:
+    high_threshold: 0.3
+    medium_threshold: 0.15
+
+# Audio Processing
+audio:
+  pre_emphasis: 0.97
+  target_sr: 16000
+  normalize: true
+
+# Inference
+inference:
+  device: "cuda"  # or "cpu"
+  batch_size: 16
+  threshold: 0.5
+
+# GAN Type Classes
+gan_types:
+  0: "Real"
+  1: "ProGAN"
+  2: "StyleGAN"
+  3: "StarGAN"
+  4: "CycleGAN"
+  5: "Deepfakes"
+  6: "Unknown"
+
+# Vocoder Type Classes
+vocoder_types:
+  0: "Real"
+  1: "WaveGlow"
+  2: "WaveRNN"
+  3: "MelGAN"
+  4: "HiFi-GAN"
+  5: "TTS"
+  6: "Unknown"
+
+# Paths
+paths:
+  checkpoints: "./checkpoints"
+  logs: "./logs"
+  temp: "./temp"
