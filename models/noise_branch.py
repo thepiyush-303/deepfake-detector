@@ -32,7 +32,7 @@ class ConstrainedConv2d(nn.Module):
             center = self.kernel_size // 2
             
             # Update center weight: w[i,j,center,center] = -sum(w[i,j]) + w[i,j,center,center]
-            weight[:, :, center, center] = -weight_sum.squeeze() + weight[:, :, center, center]
+            weight[:, :, center, center] = -weight_sum.squeeze(dim=(2, 3)) + weight[:, :, center, center]
     
     def forward(self, x):
         return self.conv(x)
