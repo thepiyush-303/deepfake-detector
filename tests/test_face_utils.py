@@ -196,15 +196,18 @@ def test_face_detector_device_cpu(face_detector):
 
 def test_contiguous_array_conversion():
     """Test that the landmark conversion produces contiguous arrays."""
-    # Create a non-contiguous tensor
-    tensor = torch.randn(10, 2)
-    non_contiguous = tensor.t().t()  # Make it non-contiguous
+    # Create a non-contiguous tensor using slicing
+    tensor = torch.randn(10, 4)
+    non_contiguous = tensor[:, ::2]  # Every other column - creates non-contiguous view
+    
+    # Verify it's actually non-contiguous
+    assert not non_contiguous.is_contiguous()
     
     # Simulate the conversion in align_face
     if hasattr(non_contiguous, 'cpu'):
         landmarks = non_contiguous.cpu().detach().numpy()
     
-    landmarks = np.array(landmarks, dtype=np.float64).astype(np.float32)
+    landmarks = np.array(landmarks, dtype=np.float32)
     landmarks = np.ascontiguousarray(landmarks.reshape(-1, 2))
     
     # Should be contiguous now

@@ -139,7 +139,7 @@ class FaceDetector:
             elif hasattr(landmarks, 'numpy'):  # Other tensor types
                 landmarks = landmarks.numpy()
             
-            landmarks = np.array(landmarks, dtype=np.float64).astype(np.float32)
+            landmarks = np.array(landmarks, dtype=np.float32)
             landmarks = np.ascontiguousarray(landmarks.reshape(-1, 2))
         except Exception:
             x1, y1, x2, y2 = map(int, bbox)
