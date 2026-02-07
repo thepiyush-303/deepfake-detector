@@ -341,5 +341,6 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
             'std': float(overall_std),
             'median': float(overall_median)
         },
-        'annotated_video_path': annotated_video_path
+        'annotated_video_path': annotated_video_path,
+        'model_trained': getattr(model, '_checkpoint_loaded', False)
     }

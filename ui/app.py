@@ -39,6 +39,34 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 visual_model = None
 audio_model = None
 
+# Untrained model warning HTML constant
+UNTRAINED_WARNING_HTML = '''
+<div style="padding: 10px; background: #332200; border: 1px solid #ff9900; border-radius: 8px; margin: 10px 0;">
+    <p style="color: #ff9900; font-size: 14px; margin: 0;">
+        ⚠️ <strong>Untrained Model</strong>: No checkpoint loaded. Predictions are random and unreliable. 
+        Train the model or provide a checkpoint path for accurate results.
+    </p>
+</div>
+'''
+
+
+def get_checkpoint_path(checkpoint_filename):
+    """
+    Get checkpoint path from config if it exists.
+    
+    Args:
+        checkpoint_filename: Name of checkpoint file (e.g., 'best_visual.pth')
+    
+    Returns:
+        Path to checkpoint if it exists, None otherwise
+    """
+    checkpoints_dir = config.get('paths', {}).get('checkpoints', '')
+    if checkpoints_dir:
+        checkpoint_path = os.path.join(checkpoints_dir, checkpoint_filename)
+        if os.path.exists(checkpoint_path):
+            return checkpoint_path
+    return None
+
 
 def initialize_models():
     """Initialize models on first use."""
@@ -46,14 +74,16 @@ def initialize_models():
     
     if visual_model is None:
         try:
-            visual_model = load_model(checkpoint_path=None, device=device)
+            visual_checkpoint_path = get_checkpoint_path('best_visual.pth')
+            visual_model = load_model(checkpoint_path=visual_checkpoint_path, device=device)
             print("Visual model initialized")
         except Exception as e:
             print(f"Error initializing visual model: {e}")
     
     if audio_model is None:
         try:
-            audio_model = load_audio_model(checkpoint_path=None, device=device)
+            audio_checkpoint_path = get_checkpoint_path('best_audio.pth')
+            audio_model = load_audio_model(checkpoint_path=audio_checkpoint_path, device=device)
             print("Audio model initialized")
         except Exception as e:
             print(f"Error initializing audio model: {e}")
@@ -90,6 +120,11 @@ def detect_image(image_file):
         fakeness = result['fakeness_score']
         confidence = result['confidence']
         face_detected = result.get('face_detected', True)
+        model_trained = result.get('model_trained', False)
+        
+        # Force LOW confidence if model is untrained
+        if not model_trained:
+            confidence = 'LOW'
         
         if verdict == 'FAKE':
             verdict_color = "#ff4444"
@@ -98,6 +133,11 @@ def detect_image(image_file):
             verdict_color = "#44ff44"
             verdict_emoji = "✅"
         
+        # Add warning if model is untrained
+        untrained_warning = ""
+        if not model_trained:
+            untrained_warning = UNTRAINED_WARNING_HTML
+        
         # Add warning if no face was detected
         warning_text = ""
         if not face_detected:
@@ -105,6 +145,7 @@ def detect_image(image_file):
         
         verdict_html = f"""
         <div style="text-align: center; padding: 20px; background: #1a1a1a; border-radius: 10px; margin: 10px 0;">
+            {untrained_warning}
             <h2 style="color: {verdict_color}; margin: 0;">{verdict_emoji} {verdict}</h2>
             {warning_text}
             <p style="color: #cccccc; font-size: 18px; margin: 10px 0;">
@@ -200,6 +241,11 @@ def detect_video(video_file, progress=gr.Progress()):
         fakeness = result['overall_score']
         confidence = result['confidence']
         consistency = result['consistency']
+        model_trained = result.get('model_trained', False)
+        
+        # Force LOW confidence if model is untrained
+        if not model_trained:
+            confidence = 'LOW'
         
         if verdict == 'FAKE':
             verdict_color = "#ff4444"
@@ -208,8 +254,14 @@ def detect_video(video_file, progress=gr.Progress()):
             verdict_color = "#44ff44"
             verdict_emoji = "✅"
         
+        # Add warning if model is untrained
+        untrained_warning = ""
+        if not model_trained:
+            untrained_warning = UNTRAINED_WARNING_HTML
+        
         verdict_html = f"""
         <div style="text-align: center; padding: 20px; background: #1a1a1a; border-radius: 10px; margin: 10px 0;">
+            {untrained_warning}
             <h2 style="color: {verdict_color}; margin: 0;">{verdict_emoji} {verdict}</h2>
             <p style="color: #cccccc; font-size: 18px; margin: 10px 0;">
                 Overall Fake Probability: <span style="color: {verdict_color}; font-weight: bold;">{fakeness:.1%}</span>
@@ -338,6 +390,11 @@ def detect_audio(audio_file, progress=gr.Progress()):
         fakeness = result['fakeness_score']
         confidence = result['confidence']
         consistency = result['consistency']
+        model_trained = result.get('model_trained', False)
+        
+        # Force LOW confidence if model is untrained
+        if not model_trained:
+            confidence = 'LOW'
         
         if verdict == 'FAKE':
             verdict_color = "#ff4444"
@@ -346,8 +403,14 @@ def detect_audio(audio_file, progress=gr.Progress()):
             verdict_color = "#44ff44"
             verdict_emoji = "✅"
         
+        # Add warning if model is untrained
+        untrained_warning = ""
+        if not model_trained:
+            untrained_warning = UNTRAINED_WARNING_HTML
+        
         verdict_html = f"""
         <div style="text-align: center; padding: 20px; background: #1a1a1a; border-radius: 10px; margin: 10px 0;">
+            {untrained_warning}
             <h2 style="color: {verdict_color}; margin: 0;">{verdict_emoji} {verdict}</h2>
             <p style="color: #cccccc; font-size: 18px; margin: 10px 0;">
                 Fake Probability: <span style="color: {verdict_color}; font-weight: bold;">{fakeness:.1%}</span>
