@@ -259,7 +259,7 @@ def detect_video(video_file, progress=gr.Progress()):
         if result['faces']:
             primary_face = result['faces'][0]
             gan_type = primary_face['gan_type']
-            gan_probs = primary_face['gan_probs']
+            gan_probs = primary_face.get('gan_probs', {})
             
             gan_html = f"""
             <div style="padding: 15px; background: #1a1a1a; border-radius: 10px; margin: 10px 0;">

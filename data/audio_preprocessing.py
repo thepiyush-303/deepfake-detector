@@ -7,6 +7,7 @@ import torch
 import torchaudio
 import torchaudio.transforms as T
 from scipy.fftpack import dct
+import warnings
 
 
 def load_audio(audio_path, target_sr=16000):
@@ -22,8 +23,49 @@ def load_audio(audio_path, target_sr=16000):
         waveform: torch.Tensor of shape (1, num_samples)
         sample_rate: int
     """
-    # Load audio
-    waveform, sr = torchaudio.load(audio_path)
+    # Try loading with different backends
+    waveform = None
+    sr = None
+    
+    # Try soundfile backend first (most compatible)
+    for backend in ['soundfile', 'sox', 'sox_io']:
+        try:
+            # For torchaudio >= 2.1.0, try to set backend
+            if hasattr(torchaudio, 'set_audio_backend'):
+                torchaudio.set_audio_backend(backend)
+            waveform, sr = torchaudio.load(audio_path)
+            break
+        except Exception as e:
+            warnings.warn(f"Failed to load audio with backend {backend}: {e}")
+            continue
+    
+    # If no specific backend worked, try default load
+    if waveform is None:
+        try:
+            waveform, sr = torchaudio.load(audio_path)
+        except Exception as e:
+            warnings.warn(f"Failed to load audio with default backend: {e}")
+    
+    # If torchaudio completely fails, fall back to scipy
+    if waveform is None:
+        try:
+            import scipy.io.wavfile as wavfile
+            sr_scipy, data = wavfile.read(audio_path)
+            if data.dtype == np.int16:
+                data = data.astype(np.float32) / 32768.0
+            elif data.dtype == np.int32:
+                data = data.astype(np.float32) / 2147483648.0
+            elif data.dtype != np.float32:
+                data = data.astype(np.float32)
+            if data.ndim == 1:
+                data = data[np.newaxis, :]  # (1, N)
+            else:
+                data = data.T  # (channels, N)
+            waveform = torch.from_numpy(data)
+            sr = sr_scipy
+        except Exception as e:
+            raise RuntimeError(f"Could not load audio file {audio_path}. "
+                             f"Install soundfile: pip install soundfile") from e
     
     # Convert to mono if stereo
     if waveform.shape[0] > 1:

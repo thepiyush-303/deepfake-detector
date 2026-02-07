@@ -173,6 +173,7 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
             'verdict': 'FAKE' if mean_score > 0.5 else 'REAL',
             'consistency': track_consistency,
             'gan_type': gan_type,
+            'gan_probs': {gan: float(prob) for gan, prob in zip(GAN_TYPES, avg_gan_probs)},
             'detections': track_detections
         })
     
@@ -260,6 +261,7 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
             'verdict': 'FAKE' if mean_score > 0.5 else 'REAL',
             'consistency': consistency,
             'gan_type': gan_type,
+            'gan_probs': {gan: float(prob) for gan, prob in zip(GAN_TYPES, avg_gan_probs)},
             'detections': []  # No face detections for full-frame analysis
         })
     
