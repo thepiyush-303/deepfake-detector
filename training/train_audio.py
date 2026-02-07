@@ -299,6 +299,107 @@ class AudioTrainer:
         return checkpoint
 
 
+def load_audio_dataset_from_directory(data_dir):
+    """
+    Load audio dataset from directory structure.
+    
+    Expected structure:
+    data_dir/
+    ├── real/
+    │   ├── audio001.wav
+    │   └── ...
+    └── fake/
+        ├── audio101.wav
+        └── ...
+    
+    Or with vocoder subdirectories:
+    data_dir/
+    ├── real/
+    └── fake/
+        ├── waveglow/
+        ├── wavernn/
+        └── ...
+    
+    Args:
+        data_dir: Path to dataset directory
+        
+    Returns:
+        tuple: (audio_paths, labels, vocoder_types)
+    """
+    if not os.path.exists(data_dir):
+        raise ValueError(f"Data directory does not exist: {data_dir}")
+    
+    audio_extensions = {'.wav', '.flac', '.mp3', '.ogg'}
+    audio_paths = []
+    labels = []
+    vocoder_types = []
+    
+    # Mapping of vocoder folder names to types
+    vocoder_map = {
+        'waveglow': 1,
+        'wavernn': 2,
+        'melgan': 3,
+        'hifigan': 4,
+        'hifi-gan': 4,
+        'tts': 5,
+    }
+    
+    # Scan for real audio files
+    real_dir = os.path.join(data_dir, 'real')
+    if os.path.exists(real_dir):
+        for root, _, files in os.walk(real_dir):
+            for file in files:
+                if os.path.splitext(file)[1].lower() in audio_extensions:
+                    audio_paths.append(os.path.join(root, file))
+                    labels.append(0)
+                    vocoder_types.append(0)  # Real audio
+    
+    # Scan for fake audio files
+    fake_dir = os.path.join(data_dir, 'fake')
+    if os.path.exists(fake_dir):
+        for root, _, files in os.walk(fake_dir):
+            for file in files:
+                if os.path.splitext(file)[1].lower() in audio_extensions:
+                    audio_paths.append(os.path.join(root, file))
+                    labels.append(1)
+                    
+                    # Try to infer vocoder type from folder structure
+                    rel_path = os.path.relpath(root, fake_dir)
+                    if rel_path == '.':
+                        # Files directly in fake/ folder (no vocoder subfolder)
+                        vocoder_type = 6  # Unknown
+                    else:
+                        folder_name = rel_path.split(os.sep)[0].lower()
+                        vocoder_type = vocoder_map.get(folder_name, 6)  # Default to Unknown
+                    vocoder_types.append(vocoder_type)
+    
+    if len(audio_paths) == 0:
+        raise ValueError(f"No audio files found in {data_dir}. "
+                        f"Expected structure with 'real/' and/or 'fake/' subdirectories.")
+    
+    # Print statistics
+    num_real = sum(1 for l in labels if l == 0)
+    num_fake = sum(1 for l in labels if l == 1)
+    
+    print(f"\nDataset loaded from: {data_dir}")
+    print(f"Total samples: {len(audio_paths)}")
+    print(f"  Real: {num_real} ({100*num_real/len(audio_paths):.1f}%)")
+    print(f"  Fake: {num_fake} ({100*num_fake/len(audio_paths):.1f}%)")
+    
+    # Count vocoder types
+    vocoder_counts = {}
+    for vt in vocoder_types:
+        vocoder_counts[vt] = vocoder_counts.get(vt, 0) + 1
+    print(f"Vocoder type distribution:")
+    vocoder_names = {0: "Real", 1: "WaveGlow", 2: "WaveRNN", 3: "MelGAN", 
+                     4: "HiFi-GAN", 5: "TTS", 6: "Unknown"}
+    for vt in sorted(vocoder_counts.keys()):
+        count = vocoder_counts[vt]
+        print(f"  {vocoder_names.get(vt, 'Unknown')}: {count} ({100*count/len(audio_paths):.1f}%)")
+    
+    return audio_paths, labels, vocoder_types
+
+
 def main():
     parser = argparse.ArgumentParser(description='Train audio deepfake detection model')
     parser.add_argument('--config', type=str, default='config/default.yaml',
@@ -309,7 +410,7 @@ def main():
                        help='Path to validation data')
     parser.add_argument('--resume', type=str, default=None,
                        help='Path to checkpoint to resume from')
-    parser.add_argument('--device', type=str, default='cuda',
+    parser.add_argument('--device', type=str, default='cpu',
                        help='Device to use (cuda/cpu)')
     
     args = parser.parse_args()
@@ -322,16 +423,30 @@ def main():
     device = args.device if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
     
-    # TODO: Load datasets (placeholder - implement based on data format)
-    # For now, create dummy loaders to show structure
-    print("Loading datasets...")
-    # train_dataset = DeepfakeAudioDataset(train_paths, train_labels, train_vocoder_types)
-    # val_dataset = DeepfakeAudioDataset(val_paths, val_labels, val_vocoder_types)
-    # train_loader = DataLoader(train_dataset, batch_size=config['training']['audio']['batch_size'], shuffle=True, num_workers=4)
-    # val_loader = DataLoader(val_dataset, batch_size=config['training']['audio']['batch_size'], shuffle=False, num_workers=4)
+    # Load datasets
+    print("\nLoading training dataset...")
+    train_paths, train_labels, train_vocoder_types = load_audio_dataset_from_directory(args.train_data)
     
-    print("Note: Dataset loading not implemented. Please implement data loading based on your data format.")
-    print("Expected format: audio_paths, labels (0/1), vocoder_types (0-6)")
+    print("\nLoading validation dataset...")
+    val_paths, val_labels, val_vocoder_types = load_audio_dataset_from_directory(args.val_data)
+    
+    # Create datasets
+    train_dataset = DeepfakeAudioDataset(train_paths, train_labels, train_vocoder_types)
+    val_dataset = DeepfakeAudioDataset(val_paths, val_labels, val_vocoder_types)
+    
+    # Create data loaders
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=config['training']['audio']['batch_size'], 
+        shuffle=True, 
+        num_workers=4
+    )
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_size=config['training']['audio']['batch_size'], 
+        shuffle=False, 
+        num_workers=4
+    )
     
     # Initialize trainer
     trainer = AudioTrainer(config, device=device)
@@ -342,7 +457,7 @@ def main():
         trainer.load_checkpoint(args.resume)
     
     # Train model
-    # trainer.train(train_loader, val_loader)
+    trainer.train(train_loader, val_loader)
 
 
 if __name__ == '__main__':
