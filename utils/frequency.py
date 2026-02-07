@@ -51,7 +51,7 @@ def compute_fft_spectrum(image_rgb, target_size=256):
     if log_magnitude.max() > log_magnitude.min():
         normalized = (log_magnitude - log_magnitude.min()) / (log_magnitude.max() - log_magnitude.min())
     else:
-        normalized = log_magnitude
+        normalized = np.zeros_like(log_magnitude)
     
     return normalized.astype(np.float32)
 
@@ -96,6 +96,6 @@ def compute_dct_spectrum(image_rgb, target_size=256):
     if log_dct.max() > log_dct.min():
         normalized = (log_dct - log_dct.min()) / (log_dct.max() - log_dct.min())
     else:
-        normalized = log_dct
+        normalized = np.zeros_like(log_dct)
     
     return normalized.astype(np.float32)

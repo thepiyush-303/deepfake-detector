@@ -126,11 +126,12 @@ class FaceDetector:
             landmarks = np.array(landmarks, dtype=np.float32)
         
         # Compute similarity transform
-        transform_matrix = cv2.estimateAffinePartial2D(
+        result = cv2.estimateAffinePartial2D(
             landmarks.reshape(-1, 2),
             reference_landmarks,
             method=cv2.LMEDS
-        )[0]
+        )
+        transform_matrix = result[0] if result is not None else None
         
         if transform_matrix is None:
             # Fallback: just crop the bounding box

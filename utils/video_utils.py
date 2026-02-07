@@ -102,6 +102,7 @@ def track_faces(frames, face_bboxes):
     
     # Initialize tracking
     tracks = []
+    track_results = []
     next_track_id = 0
     
     for frame_idx, bboxes in enumerate(face_bboxes):
@@ -157,11 +158,7 @@ def track_faces(frames, face_bboxes):
                     frame_tracks.append(next_track_id)
                     next_track_id += 1
         
-        # Store tracks for this frame (update structure to match input)
-        if frame_idx == 0:
-            track_results = [frame_tracks]
-        else:
-            track_results.append(frame_tracks)
+        track_results.append(frame_tracks)
     
     return track_results
 
