@@ -39,6 +39,34 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 visual_model = None
 audio_model = None
 
+# Untrained model warning HTML constant
+UNTRAINED_WARNING_HTML = '''
+<div style="padding: 10px; background: #332200; border: 1px solid #ff9900; border-radius: 8px; margin: 10px 0;">
+    <p style="color: #ff9900; font-size: 14px; margin: 0;">
+        ⚠️ <strong>Untrained Model</strong>: No checkpoint loaded. Predictions are random and unreliable. 
+        Train the model or provide a checkpoint path for accurate results.
+    </p>
+</div>
+'''
+
+
+def get_checkpoint_path(checkpoint_filename):
+    """
+    Get checkpoint path from config if it exists.
+    
+    Args:
+        checkpoint_filename: Name of checkpoint file (e.g., 'best_visual.pth')
+    
+    Returns:
+        Path to checkpoint if it exists, None otherwise
+    """
+    checkpoints_dir = config.get('paths', {}).get('checkpoints', '')
+    if checkpoints_dir:
+        checkpoint_path = os.path.join(checkpoints_dir, checkpoint_filename)
+        if os.path.exists(checkpoint_path):
+            return checkpoint_path
+    return None
+
 
 def initialize_models():
     """Initialize models on first use."""
@@ -46,14 +74,7 @@ def initialize_models():
     
     if visual_model is None:
         try:
-            # Try to load checkpoint from config
-            visual_checkpoint_path = None
-            checkpoints_dir = config.get('paths', {}).get('checkpoints', '')
-            if checkpoints_dir:
-                visual_checkpoint_file = os.path.join(checkpoints_dir, 'best_visual.pth')
-                if os.path.exists(visual_checkpoint_file):
-                    visual_checkpoint_path = visual_checkpoint_file
-            
+            visual_checkpoint_path = get_checkpoint_path('best_visual.pth')
             visual_model = load_model(checkpoint_path=visual_checkpoint_path, device=device)
             print("Visual model initialized")
         except Exception as e:
@@ -61,14 +82,7 @@ def initialize_models():
     
     if audio_model is None:
         try:
-            # Try to load checkpoint from config
-            audio_checkpoint_path = None
-            checkpoints_dir = config.get('paths', {}).get('checkpoints', '')
-            if checkpoints_dir:
-                audio_checkpoint_file = os.path.join(checkpoints_dir, 'best_audio.pth')
-                if os.path.exists(audio_checkpoint_file):
-                    audio_checkpoint_path = audio_checkpoint_file
-            
+            audio_checkpoint_path = get_checkpoint_path('best_audio.pth')
             audio_model = load_audio_model(checkpoint_path=audio_checkpoint_path, device=device)
             print("Audio model initialized")
         except Exception as e:
@@ -122,14 +136,7 @@ def detect_image(image_file):
         # Add warning if model is untrained
         untrained_warning = ""
         if not model_trained:
-            untrained_warning = '''
-            <div style="padding: 10px; background: #332200; border: 1px solid #ff9900; border-radius: 8px; margin: 10px 0;">
-                <p style="color: #ff9900; font-size: 14px; margin: 0;">
-                    ⚠️ <strong>Untrained Model</strong>: No checkpoint loaded. Predictions are random and unreliable. 
-                    Train the model or provide a checkpoint path for accurate results.
-                </p>
-            </div>
-            '''
+            untrained_warning = UNTRAINED_WARNING_HTML
         
         # Add warning if no face was detected
         warning_text = ""
@@ -250,14 +257,7 @@ def detect_video(video_file, progress=gr.Progress()):
         # Add warning if model is untrained
         untrained_warning = ""
         if not model_trained:
-            untrained_warning = '''
-            <div style="padding: 10px; background: #332200; border: 1px solid #ff9900; border-radius: 8px; margin: 10px 0;">
-                <p style="color: #ff9900; font-size: 14px; margin: 0;">
-                    ⚠️ <strong>Untrained Model</strong>: No checkpoint loaded. Predictions are random and unreliable. 
-                    Train the model or provide a checkpoint path for accurate results.
-                </p>
-            </div>
-            '''
+            untrained_warning = UNTRAINED_WARNING_HTML
         
         verdict_html = f"""
         <div style="text-align: center; padding: 20px; background: #1a1a1a; border-radius: 10px; margin: 10px 0;">
@@ -406,14 +406,7 @@ def detect_audio(audio_file, progress=gr.Progress()):
         # Add warning if model is untrained
         untrained_warning = ""
         if not model_trained:
-            untrained_warning = '''
-            <div style="padding: 10px; background: #332200; border: 1px solid #ff9900; border-radius: 8px; margin: 10px 0;">
-                <p style="color: #ff9900; font-size: 14px; margin: 0;">
-                    ⚠️ <strong>Untrained Model</strong>: No checkpoint loaded. Predictions are random and unreliable. 
-                    Train the model or provide a checkpoint path for accurate results.
-                </p>
-            </div>
-            '''
+            untrained_warning = UNTRAINED_WARNING_HTML
         
         verdict_html = f"""
         <div style="text-align: center; padding: 20px; background: #1a1a1a; border-radius: 10px; margin: 10px 0;">
