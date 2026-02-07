@@ -21,14 +21,17 @@ IMAGENET_STD = [0.229, 0.224, 0.225]
 def preprocess_image(image_path, target_size=256):
     """
     Load image, detect face, align, and resize.
+    Falls back to center-cropped full image if no face detected.
     
     Args:
         image_path: Path to input image
         target_size: Target size for output (default: 256)
     
     Returns:
-        Aligned and resized face image as RGB numpy array (H, W, 3)
-        Returns None if no face detected
+        Tuple of (aligned_face, face_detected):
+        - aligned_face: Aligned and resized face image as RGB numpy array (H, W, 3)
+                       or center-cropped full image if no face detected
+        - face_detected: Boolean indicating if a face was detected
     """
     try:
         # Load image
@@ -43,7 +46,21 @@ def preprocess_image(image_path, target_size=256):
         detection = detector.detect_faces(image_np)
         
         if len(detection['boxes']) == 0:
-            return None
+            # No face detected - use center-cropped full image as fallback
+            print("⚠️ No face detected, using full image as fallback")
+            
+            # Center crop the image to square
+            h, w = image_np.shape[:2]
+            size = min(h, w)
+            start_y = (h - size) // 2
+            start_x = (w - size) // 2
+            cropped_image = image_np[start_y:start_y+size, start_x:start_x+size]
+            
+            # Resize to target size
+            if cropped_image.shape[0] != target_size or cropped_image.shape[1] != target_size:
+                cropped_image = cv2.resize(cropped_image, (target_size, target_size), interpolation=cv2.INTER_LINEAR)
+            
+            return cropped_image, False
         
         # Use the first detected face
         bbox = detection['boxes'][0]
@@ -56,11 +73,12 @@ def preprocess_image(image_path, target_size=256):
         if aligned_face.shape[0] != target_size or aligned_face.shape[1] != target_size:
             aligned_face = cv2.resize(aligned_face, (target_size, target_size), interpolation=cv2.INTER_LINEAR)
         
-        return aligned_face
+        return aligned_face, True
     
     except Exception as e:
         print(f"Error processing image {image_path}: {e}")
-        return None
+        # Re-raise the exception so callers can handle it appropriately
+        raise
 
 
 def extract_fingerprints(image_rgb):

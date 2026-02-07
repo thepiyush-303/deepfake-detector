@@ -165,7 +165,82 @@ def predict_video(video_path, model, device='cuda', output_dir='output'):
         })
     
     if len(face_results) == 0:
-        raise ValueError("No faces could be processed in the video")
+        # No faces detected - fall back to analyzing full frames
+        print("⚠️ No faces detected in video, using full frames as fallback")
+        
+        # Process up to 8 frames with center crops
+        num_frames_to_process = min(8, len(frames))
+        frame_scores = []
+        frame_gan_probs = []
+        
+        for i in range(num_frames_to_process):
+            frame = frames[i]
+            
+            try:
+                # Center crop the frame to square
+                h, w = frame.shape[:2]
+                size = min(h, w)
+                start_y = (h - size) // 2
+                start_x = (w - size) // 2
+                cropped_frame = frame[start_y:start_y+size, start_x:start_x+size]
+                
+                # Resize to 256x256
+                cropped_frame = cv2.resize(cropped_frame, (256, 256), interpolation=cv2.INTER_LINEAR)
+                
+                # Extract fingerprints
+                fingerprints = extract_fingerprints(cropped_frame)
+                
+                # Prepare inputs
+                rgb = torch.from_numpy(fingerprints['rgb']).unsqueeze(0).float().to(device)
+                spectrum = np.stack([fingerprints['fft'], fingerprints['dct']], axis=0)
+                spectrum = torch.from_numpy(spectrum).unsqueeze(0).float().to(device)
+                noise = torch.from_numpy(fingerprints['srm']).unsqueeze(0).float().to(device)
+                
+                # Run inference
+                with torch.no_grad():
+                    binary_probs, gan_type_probs, _ = model(rgb, spectrum, noise, return_probs=True)
+                
+                fakeness_score = binary_probs.squeeze().cpu().item()
+                gan_probs = gan_type_probs.squeeze().cpu().numpy()
+                
+                frame_scores.append(fakeness_score)
+                frame_gan_probs.append(gan_probs)
+                per_frame_scores[i].append(fakeness_score)
+                
+            except Exception as e:
+                warnings.warn(f"Error processing frame {i}: {e}")
+                continue
+        
+        if len(frame_scores) == 0:
+            # Still couldn't process any frames
+            raise ValueError("Could not process any frames from the video")
+        
+        # Create a single "face" result for the full-frame analysis
+        mean_score = np.mean(frame_scores)
+        std_score = np.std(frame_scores)
+        median_score = np.median(frame_scores)
+        avg_gan_probs = np.mean(frame_gan_probs, axis=0)
+        gan_type_idx = np.argmax(avg_gan_probs)
+        gan_type = GAN_TYPES[gan_type_idx]
+        
+        if std_score <= 0.10:
+            consistency = 'STABLE'
+        elif std_score <= 0.25:
+            consistency = 'MODERATE'
+        else:
+            consistency = 'UNSTABLE'
+        
+        face_results.append({
+            'track_id': 0,
+            'num_detections': len(frame_scores),
+            'mean_score': float(mean_score),
+            'std_score': float(std_score),
+            'median_score': float(median_score),
+            'verdict': 'FAKE' if mean_score > 0.5 else 'REAL',
+            'consistency': consistency,
+            'gan_type': gan_type,
+            'detections': []  # No face detections for full-frame analysis
+        })
     
     # Overall temporal aggregation
     all_scores = [result['mean_score'] for result in face_results]

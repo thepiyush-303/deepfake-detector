@@ -31,8 +31,15 @@ def load_model(checkpoint_path=None, device='cuda'):
     """
     device = torch.device(device if torch.cuda.is_available() else 'cpu')
     
-    # Initialize model
-    model = DeepfakeFusionModel(pretrained=True)
+    # Initialize model - use pretrained=False if no checkpoint provided to avoid network access
+    pretrained = False if checkpoint_path is None else True
+    try:
+        model = DeepfakeFusionModel(pretrained=pretrained)
+    except Exception as e:
+        # If pretrained download fails, fall back to random initialization
+        warnings.warn(f"Failed to load pretrained weights: {e}. Using random initialization.")
+        model = DeepfakeFusionModel(pretrained=False)
+    
     model = model.to(device)
     
     # Load checkpoint if provided
@@ -76,15 +83,39 @@ def predict_image(image_path, model, device='cuda'):
             - gan_type: Most likely GAN type if fake
             - gan_probs: Dictionary of GAN type probabilities
             - branch_contributions: Dictionary of branch contribution scores
-            - image: Original aligned face image
+            - image: Original aligned face image or full image
+            - face_detected: Boolean indicating if a face was detected
     """
     device = torch.device(device if torch.cuda.is_available() else 'cpu')
     
-    # Preprocess image: detect face and align
-    aligned_face = preprocess_image(image_path, target_size=256)
+    # Preprocess image: detect face and align (with fallback to full image)
+    result_tuple = preprocess_image(image_path, target_size=256)
+    
+    # Handle both old (single value) and new (tuple) return formats for compatibility
+    if isinstance(result_tuple, tuple):
+        aligned_face, face_detected = result_tuple
+    else:
+        # Old format for compatibility
+        aligned_face = result_tuple
+        face_detected = aligned_face is not None
     
     if aligned_face is None:
-        raise ValueError(f"No face detected in image: {image_path}")
+        # Last resort fallback: load image directly and center-crop
+        print("⚠️ No face detected, using full image as fallback")
+        face_detected = False
+        
+        image = Image.open(image_path).convert('RGB')
+        image_np = np.array(image)
+        
+        # Center crop the image to square
+        h, w = image_np.shape[:2]
+        size = min(h, w)
+        start_y = (h - size) // 2
+        start_x = (w - size) // 2
+        aligned_face = image_np[start_y:start_y+size, start_x:start_x+size]
+        
+        # Resize to 256x256
+        aligned_face = cv2.resize(aligned_face, (256, 256), interpolation=cv2.INTER_LINEAR)
     
     # Extract forensic fingerprints
     fingerprints = extract_fingerprints(aligned_face)
@@ -144,7 +175,8 @@ def predict_image(image_path, model, device='cuda'):
         'gan_type': gan_type,
         'gan_probs': gan_probs,
         'branch_contributions': branch_contributions,
-        'image': aligned_face
+        'image': aligned_face,
+        'face_detected': face_detected
     }
 
 

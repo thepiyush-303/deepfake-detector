@@ -28,8 +28,15 @@ def load_audio_model(checkpoint_path=None, device='cuda'):
     """
     device = torch.device(device if torch.cuda.is_available() else 'cpu')
     
-    # Initialize model
-    model = AudioDeepfakeModel(pretrained=True)
+    # Initialize model - use pretrained=False if no checkpoint provided to avoid network access
+    pretrained = False if checkpoint_path is None else True
+    try:
+        model = AudioDeepfakeModel(pretrained=pretrained)
+    except Exception as e:
+        # If pretrained download fails, fall back to random initialization
+        warnings.warn(f"Failed to load pretrained weights: {e}. Using random initialization.")
+        model = AudioDeepfakeModel(pretrained=False)
+    
     model = model.to(device)
     
     # Load checkpoint if provided

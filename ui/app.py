@@ -86,6 +86,7 @@ def detect_image(image_file):
         verdict = result['verdict']
         fakeness = result['fakeness_score']
         confidence = result['confidence']
+        face_detected = result.get('face_detected', True)
         
         if verdict == 'FAKE':
             verdict_color = "#ff4444"
@@ -94,9 +95,15 @@ def detect_image(image_file):
             verdict_color = "#44ff44"
             verdict_emoji = "✅"
         
+        # Add warning if no face was detected
+        warning_text = ""
+        if not face_detected:
+            warning_text = '<p style="color: #ff9900; font-size: 14px; margin: 10px 0;">⚠️ No face detected — analyzing full image</p>'
+        
         verdict_html = f"""
         <div style="text-align: center; padding: 20px; background: #1a1a1a; border-radius: 10px; margin: 10px 0;">
             <h2 style="color: {verdict_color}; margin: 0;">{verdict_emoji} {verdict}</h2>
+            {warning_text}
             <p style="color: #cccccc; font-size: 18px; margin: 10px 0;">
                 Fake Probability: <span style="color: {verdict_color}; font-weight: bold;">{fakeness:.1%}</span>
             </p>
@@ -154,12 +161,6 @@ def detect_image(image_file):
         
         return face_image, verdict_html, gan_html, heatmap_pil
         
-    except ValueError as e:
-        error_msg = str(e)
-        if "No face" in error_msg:
-            return None, "❌ No face detected in image", "", None
-        else:
-            return None, f"❌ Error: {error_msg}", "", None
     except Exception as e:
         return None, f"❌ Error processing image: {str(e)}", "", None
 

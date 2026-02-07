@@ -292,10 +292,17 @@ def test_preprocessing_pipeline(tmp_path):
     
     # Test preprocessing (may fail if no face detected, which is expected)
     try:
-        aligned_face = preprocess_image(str(input_path), target_size=256)
+        result = preprocess_image(str(input_path), target_size=256)
+        
+        # Handle new tuple return format (aligned_face, face_detected)
+        if isinstance(result, tuple):
+            aligned_face, face_detected = result
+        else:
+            aligned_face = result
+            face_detected = aligned_face is not None
         
         if aligned_face is not None:
-            # If face was detected (unlikely with random image), verify shape
+            # If face was detected or fallback used, verify shape
             assert aligned_face.shape[2] == 3  # RGB
             
             # Test fingerprint extraction
@@ -305,7 +312,11 @@ def test_preprocessing_pipeline(tmp_path):
             assert 'dct' in fingerprints
             assert 'srm' in fingerprints
             
-            print("✓ Preprocessing pipeline test passed (face detected)")
+            if face_detected:
+                msg = "✓ Preprocessing pipeline test passed (face detected)"
+            else:
+                msg = "✓ Preprocessing pipeline test passed (fallback used)"
+            print(msg)
         else:
             # No face detected - expected for random image
             print("✓ Preprocessing pipeline test passed (no face detected, as expected)")
