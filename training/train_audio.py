@@ -365,8 +365,12 @@ def load_audio_dataset_from_directory(data_dir):
                     
                     # Try to infer vocoder type from folder structure
                     rel_path = os.path.relpath(root, fake_dir)
-                    folder_name = rel_path.split(os.sep)[0].lower() if rel_path != '.' else ''
-                    vocoder_type = vocoder_map.get(folder_name, 6)  # Default to Unknown
+                    if rel_path == '.':
+                        # Files directly in fake/ folder (no vocoder subfolder)
+                        vocoder_type = 6  # Unknown
+                    else:
+                        folder_name = rel_path.split(os.sep)[0].lower()
+                        vocoder_type = vocoder_map.get(folder_name, 6)  # Default to Unknown
                     vocoder_types.append(vocoder_type)
     
     if len(audio_paths) == 0:

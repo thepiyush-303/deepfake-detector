@@ -382,6 +382,9 @@ def load_visual_dataset_from_directory(data_dir):
     ├── deepfakes/
     └── unknown/
     
+    Note: Only direct subfolders of data_dir are scanned. Nested directories
+    within each GAN type folder are not supported and will be skipped.
+    
     Args:
         data_dir: Path to dataset directory
         
@@ -412,7 +415,7 @@ def load_visual_dataset_from_directory(data_dir):
         rel_path = os.path.relpath(root, data_dir)
         folder_name = rel_path.split(os.sep)[0].lower() if rel_path != '.' else ''
         
-        # Skip if not a direct subfolder
+        # Skip if not a direct subfolder (nested directories are not supported)
         if os.sep in rel_path:
             continue
             
@@ -421,6 +424,8 @@ def load_visual_dataset_from_directory(data_dir):
             label, gan_type = gan_map[folder_name]
         else:
             # Unrecognized folder with images is treated as unknown fake
+            if folder_name:  # Only warn if it's not the root directory
+                print(f"Warning: Unrecognized folder '{folder_name}' - treating as Unknown fake (GAN type 6)")
             label, gan_type = 1, 6
         
         # Collect image files
