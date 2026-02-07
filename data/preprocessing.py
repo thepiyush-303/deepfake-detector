@@ -77,7 +77,8 @@ def preprocess_image(image_path, target_size=256):
     
     except Exception as e:
         print(f"Error processing image {image_path}: {e}")
-        return None, False
+        # Re-raise the exception so callers can handle it appropriately
+        raise
 
 
 def extract_fingerprints(image_rgb):

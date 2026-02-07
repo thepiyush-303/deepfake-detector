@@ -24,11 +24,14 @@ class FaceDetector:
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         self.device = device
+        # Initialize MTCNN with lenient settings for better face detection
+        # min_face_size=20: Allow detection of smaller/distant faces
+        # thresholds=[0.5, 0.6, 0.6]: More lenient detection at each stage
         self.mtcnn = MTCNN(
             keep_all=True,
             device=self.device,
             post_process=False,
-            min_face_size=20,
+            min_face_size=20,  # Lower than detect_faces min_size to detect more candidates
             thresholds=[0.5, 0.6, 0.6]
         )
     

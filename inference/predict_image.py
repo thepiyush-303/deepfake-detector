@@ -104,7 +104,6 @@ def predict_image(image_path, model, device='cuda'):
         print("⚠️ No face detected, using full image as fallback")
         face_detected = False
         
-        from PIL import Image
         image = Image.open(image_path).convert('RGB')
         image_np = np.array(image)
         
@@ -116,7 +115,6 @@ def predict_image(image_path, model, device='cuda'):
         aligned_face = image_np[start_y:start_y+size, start_x:start_x+size]
         
         # Resize to 256x256
-        import cv2
         aligned_face = cv2.resize(aligned_face, (256, 256), interpolation=cv2.INTER_LINEAR)
     
     # Extract forensic fingerprints

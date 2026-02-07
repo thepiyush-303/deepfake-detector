@@ -312,7 +312,11 @@ def test_preprocessing_pipeline(tmp_path):
             assert 'dct' in fingerprints
             assert 'srm' in fingerprints
             
-            print("✓ Preprocessing pipeline test passed (face detected)" if face_detected else "✓ Preprocessing pipeline test passed (fallback used)")
+            if face_detected:
+                msg = "✓ Preprocessing pipeline test passed (face detected)"
+            else:
+                msg = "✓ Preprocessing pipeline test passed (fallback used)"
+            print(msg)
         else:
             # No face detected - expected for random image
             print("✓ Preprocessing pipeline test passed (no face detected, as expected)")
