@@ -28,25 +28,23 @@ def load_audio(audio_path, target_sr=16000):
     sr = None
     
     # Try soundfile backend first (most compatible)
-    for backend in ['soundfile', 'sox', 'sox_io', None]:
+    for backend in ['soundfile', 'sox', 'sox_io']:
         try:
-            if backend is not None:
-                # Try to set backend and load
-                try:
-                    # For torchaudio >= 2.1.0, use functional API
-                    if hasattr(torchaudio, 'set_audio_backend'):
-                        torchaudio.set_audio_backend(backend)
-                    waveform, sr = torchaudio.load(audio_path)
-                except Exception:
-                    # For torchaudio >= 2.5.0, backend parameter is deprecated
-                    # Try direct load which may work with available backends
-                    waveform, sr = torchaudio.load(audio_path)
-            else:
-                waveform, sr = torchaudio.load(audio_path)
+            # For torchaudio >= 2.1.0, try to set backend
+            if hasattr(torchaudio, 'set_audio_backend'):
+                torchaudio.set_audio_backend(backend)
+            waveform, sr = torchaudio.load(audio_path)
             break
         except Exception as e:
             warnings.warn(f"Failed to load audio with backend {backend}: {e}")
             continue
+    
+    # If no specific backend worked, try default load
+    if waveform is None:
+        try:
+            waveform, sr = torchaudio.load(audio_path)
+        except Exception as e:
+            warnings.warn(f"Failed to load audio with default backend: {e}")
     
     # If torchaudio completely fails, fall back to scipy
     if waveform is None:
