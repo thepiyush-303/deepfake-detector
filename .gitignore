@@ -48,3 +48,7 @@ data/processed/
 # OS
 .DS_Store
 Thumbs.db
+
+# Temporary validation files
+validate_system.py
+IMPLEMENTATION_STATUS.md
