@@ -49,22 +49,12 @@ class DeepfakeFusionModel(nn.Module):
         )
         
         # Binary classification head: P(fake)
-        # Note: Sigmoid is included as per architecture spec. For training,
-        # consider using BCEWithLogitsLoss and removing this activation.
-        self.binary_head = nn.Sequential(
-            nn.Linear(128, 1),
-            nn.Sigmoid()
-        )
+        self.binary_head = nn.Linear(128, 1)
         
         # GAN type classification head (7 classes)
-        # Note: Softmax is included as per architecture spec. For training,
-        # consider using CrossEntropyLoss and removing this activation.
-        self.gan_type_head = nn.Sequential(
-            nn.Linear(128, 7),
-            nn.Softmax(dim=1)
-        )
+        self.gan_type_head = nn.Linear(128, 7)
     
-    def forward(self, rgb, spectrum, noise):
+    def forward(self, rgb, spectrum, noise, return_probs=False):
         """
         Forward pass through the fusion model.
         
@@ -72,11 +62,12 @@ class DeepfakeFusionModel(nn.Module):
             rgb: (B, 3, H, W) - ImageNet-normalized RGB
             spectrum: (B, 2, H, W) - FFT and DCT magnitude spectrums
             noise: (B, 30, H, W) - SRM filter output
+            return_probs: If True, apply sigmoid/softmax to outputs (default: False for training)
         
         Returns:
             Tuple of:
-                - binary_logits: (B, 1) - P(fake)
-                - gan_type_logits: (B, 7) - GAN type probabilities
+                - binary_logits: (B, 1) - Raw logits or P(fake) if return_probs=True
+                - gan_type_logits: (B, 7) - Raw logits or probabilities if return_probs=True
                 - features_dict: Dictionary with branch features
         """
         # Extract features from each branch
@@ -90,9 +81,14 @@ class DeepfakeFusionModel(nn.Module):
         # Pass through fusion head
         fusion_output = self.fusion_head(fused_features)  # (B, 128)
         
-        # Dual-head outputs
+        # Dual-head outputs (raw logits)
         binary_logits = self.binary_head(fusion_output)      # (B, 1)
         gan_type_logits = self.gan_type_head(fusion_output)  # (B, 7)
+        
+        # Apply activations if requested (for inference)
+        if return_probs:
+            binary_logits = torch.sigmoid(binary_logits)
+            gan_type_logits = torch.softmax(gan_type_logits, dim=1)
         
         # Store features for explainability
         features_dict = {

@@ -196,12 +196,8 @@ class VisualTrainer:
             
             # Forward pass with mixed precision
             with autocast():
-                # Remove sigmoid/softmax from model outputs for training
+                # Model returns raw logits for training
                 binary_logits, gan_type_logits, features_dict = self.model(rgb, spectrum, noise)
-                
-                # Convert back to logits (model has sigmoid/softmax in output)
-                binary_logits = torch.logit(binary_logits.clamp(1e-7, 1-1e-7))
-                gan_type_logits = torch.log(gan_type_logits.clamp(1e-7, 1.0))
                 
                 # Compute loss
                 loss_dict = self.criterion(
@@ -257,13 +253,13 @@ class VisualTrainer:
                 binary_labels_gpu = binary_labels.to(self.device)
                 gan_types = gan_types.to(self.device)
                 
-                # Forward pass
-                binary_logits, gan_type_logits, features_dict = self.model(rgb, spectrum, noise)
+                # Forward pass (with probabilities for evaluation)
+                binary_logits, gan_type_logits, features_dict = self.model(rgb, spectrum, noise, return_probs=True)
                 
-                # Binary predictions (model outputs sigmoid)
+                # Binary predictions (already sigmoid activated)
                 binary_preds = binary_logits.squeeze().cpu().numpy()
                 
-                # Convert to logits for loss
+                # Convert back to logits for loss computation
                 binary_logits_loss = torch.logit(binary_logits.clamp(1e-7, 1-1e-7))
                 gan_type_logits_loss = torch.log(gan_type_logits.clamp(1e-7, 1.0))
                 

@@ -147,23 +147,14 @@ class AudioTrainer:
             
             # Forward pass with mixed precision
             with autocast():
-                # Remove sigmoid/softmax from model outputs for training
-                binary_logits, vocoder_type_logits = self.model(mel_features, lfcc_features)
+                # Model returns raw logits for training
+                binary_logits, vocoder_type_logits, fusion_features = self.model(mel_features, lfcc_features)
                 
-                # Convert back to logits (model has sigmoid/softmax in output)
-                binary_logits = torch.logit(binary_logits.clamp(1e-7, 1-1e-7))
-                vocoder_type_logits = torch.log(vocoder_type_logits.clamp(1e-7, 1.0))
-                
-                # For center loss, use fusion output as features
-                # We need to extract it, so let's modify forward pass temporarily
-                # For now, use binary logits as proxy (not ideal but functional)
-                features = binary_logits  # Placeholder
-                
-                # Compute loss
+                # Compute loss using fusion features for center loss
                 loss_dict = self.criterion(
                     binary_logits,
                     vocoder_type_logits,
-                    features,
+                    fusion_features,
                     binary_labels,
                     vocoder_types
                 )
@@ -218,24 +209,21 @@ class AudioTrainer:
                 binary_labels_expanded = binary_labels.unsqueeze(1).expand(-1, num_segments).reshape(-1).to(self.device)
                 vocoder_types_expanded = vocoder_types.unsqueeze(1).expand(-1, num_segments).reshape(-1).to(self.device)
                 
-                # Forward pass
-                binary_logits, vocoder_type_logits = self.model(mel_features, lfcc_features)
+                # Forward pass (with probabilities for evaluation)
+                binary_logits, vocoder_type_logits, fusion_features = self.model(mel_features, lfcc_features, return_probs=True)
                 
-                # Binary predictions (model outputs sigmoid) - average over segments
+                # Binary predictions (already sigmoid activated) - average over segments
                 binary_preds = binary_logits.squeeze().view(batch_size, num_segments).mean(dim=1).cpu().numpy()
                 
-                # Convert to logits for loss
+                # Convert back to logits for loss computation
                 binary_logits_loss = torch.logit(binary_logits.clamp(1e-7, 1-1e-7))
                 vocoder_type_logits_loss = torch.log(vocoder_type_logits.clamp(1e-7, 1.0))
-                
-                # Placeholder features
-                features = binary_logits_loss
                 
                 # Compute loss
                 loss_dict = self.criterion(
                     binary_logits_loss,
                     vocoder_type_logits_loss,
-                    features,
+                    fusion_features,
                     binary_labels_expanded,
                     vocoder_types_expanded
                 )

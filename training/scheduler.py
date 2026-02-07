@@ -2,6 +2,7 @@
 Learning rate schedulers for deepfake detection training.
 """
 
+import math
 import torch
 from torch.optim.lr_scheduler import _LRScheduler, CosineAnnealingLR, CosineAnnealingWarmRestarts
 
@@ -58,7 +59,7 @@ class CosineAnnealingWithWarmup(_LRScheduler):
             current_epoch = self.last_epoch - self.warmup_epochs
             return [
                 self.eta_min + (base_lr - self.eta_min) *
-                (1 + torch.cos(torch.tensor(current_epoch / self.T_max * 3.141592653589793))) / 2
+                (1 + torch.cos(torch.tensor(current_epoch / self.T_max * math.pi))) / 2
                 for base_lr in self.base_lrs
             ]
 
@@ -103,7 +104,7 @@ class CosineAnnealingWarmRestartsWithWarmup(_LRScheduler):
             
             return [
                 self.eta_min + (base_lr - self.eta_min) *
-                (1 + torch.cos(torch.tensor(self.T_cur / self.T_i * 3.141592653589793))) / 2
+                (1 + torch.cos(torch.tensor(self.T_cur / self.T_i * math.pi))) / 2
                 for base_lr in self.base_lrs
             ]
 

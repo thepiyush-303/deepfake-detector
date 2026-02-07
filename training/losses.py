@@ -36,8 +36,8 @@ class LabelSmoothedBCELoss(nn.Module):
         
         targets = targets.float()
         
-        # Apply label smoothing
-        targets_smooth = targets * (1 - self.epsilon) + (1 - targets) * self.epsilon / 2
+        # Apply label smoothing: 0 -> epsilon, 1 -> (1 - epsilon)
+        targets_smooth = targets * (1 - self.epsilon) + self.epsilon / 2
         
         # Use BCEWithLogitsLoss for numerical stability
         loss = F.binary_cross_entropy_with_logits(logits, targets_smooth)
