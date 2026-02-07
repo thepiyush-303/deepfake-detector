@@ -61,6 +61,9 @@ def load_model(checkpoint_path=None, device='cuda'):
         else:
             warnings.warn("No checkpoint provided. Using randomly initialized model.")
     
+    # Mark whether a real checkpoint was loaded
+    model._checkpoint_loaded = (checkpoint_path is not None and os.path.exists(checkpoint_path))
+    
     model.eval()
     return model
 
@@ -176,7 +179,8 @@ def predict_image(image_path, model, device='cuda'):
         'gan_probs': gan_probs,
         'branch_contributions': branch_contributions,
         'image': aligned_face,
-        'face_detected': face_detected
+        'face_detected': face_detected,
+        'model_trained': getattr(model, '_checkpoint_loaded', False)
     }
 
 
