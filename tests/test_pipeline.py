@@ -200,6 +200,12 @@ def test_video_pipeline(dummy_video_file, visual_model, tmp_path):
     # Verify per_frame_scores is a list
     assert isinstance(result['per_frame_scores'], list)
     
+    # Verify per_frame_scores contains flat numbers, not nested lists
+    if len(result['per_frame_scores']) > 0:
+        for score in result['per_frame_scores']:
+            assert isinstance(score, (int, float, np.number)), f"Expected flat number, got {type(score)}: {score}"
+            assert 0.0 <= score <= 1.0, f"Score {score} not in valid range [0, 1]"
+    
     print("✓ Video pipeline test passed")
 
 

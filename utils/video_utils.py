@@ -106,6 +106,23 @@ def track_faces(frames, face_bboxes):
     next_track_id = 0
     
     for frame_idx, bboxes in enumerate(face_bboxes):
+        # Handle empty bbox lists
+        if len(bboxes) == 0:
+            track_results.append([])
+            continue
+        
+        # Convert any remaining tensors to lists
+        clean_bboxes = []
+        for bbox in bboxes:
+            # Handle PyTorch tensors
+            if hasattr(bbox, 'cpu'):
+                bbox = bbox.cpu().detach().numpy().tolist()
+            # Handle numpy arrays
+            elif hasattr(bbox, 'tolist'):
+                bbox = bbox if isinstance(bbox, list) else bbox.tolist()
+            clean_bboxes.append(bbox)
+        bboxes = clean_bboxes
+        
         if frame_idx == 0:
             # Initialize tracks for first frame
             frame_tracks = []
@@ -174,8 +191,12 @@ def compute_iou(bbox1, bbox2):
     Returns:
         IoU score between 0 and 1
     """
-    x1_1, y1_1, x2_1, y2_1 = bbox1
-    x1_2, y1_2, x2_2, y2_2 = bbox2
+    # Convert to float to handle tensors
+    b1 = [float(v) for v in bbox1]
+    b2 = [float(v) for v in bbox2]
+    
+    x1_1, y1_1, x2_1, y2_1 = b1
+    x1_2, y1_2, x2_2, y2_2 = b2
     
     # Compute intersection
     x1_i = max(x1_1, x1_2)
