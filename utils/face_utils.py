@@ -64,6 +64,14 @@ class FaceDetector:
         if boxes is None:
             return {'boxes': [], 'probs': [], 'landmarks': []}
         
+        # Convert tensors to numpy if needed
+        if hasattr(boxes, 'cpu'):
+            boxes = boxes.cpu().detach().numpy()
+        if hasattr(probs, 'cpu'):
+            probs = probs.cpu().detach().numpy()
+        if hasattr(landmarks, 'cpu'):
+            landmarks = landmarks.cpu().detach().numpy()
+        
         # Filter by confidence and size
         valid_faces = []
         valid_probs = []
@@ -113,37 +121,50 @@ class FaceDetector:
             Aligned face image as numpy array
         """
         if image is None or landmarks is None:
-            # Fallback: just crop the bounding box
             x1, y1, x2, y2 = map(int, bbox)
             return image[y1:y2, x1:x2]
         
-        # Define reference landmarks (normalized positions for a 112x112 face)
         reference_landmarks = np.array([
-            [38.2946, 51.6963],  # Left eye
-            [73.5318, 51.5014],  # Right eye
-            [56.0252, 71.7366],  # Nose
-            [41.5493, 92.3655],  # Left mouth
-            [70.7299, 92.2041]   # Right mouth
+            [38.2946, 51.6963],
+            [73.5318, 51.5014],
+            [56.0252, 71.7366],
+            [41.5493, 92.3655],
+            [70.7299, 92.2041]
         ], dtype=np.float32)
         
-        # Convert landmarks to numpy array if not already
-        if not isinstance(landmarks, np.ndarray):
+        # Force proper numpy float32 conversion (handles tensors, lists, object arrays)
+        try:
+            if hasattr(landmarks, 'cpu'):  # PyTorch tensor
+                landmarks = landmarks.cpu().detach().numpy()
+            elif hasattr(landmarks, 'numpy'):  # Other tensor types
+                landmarks = landmarks.numpy()
+            
             landmarks = np.array(landmarks, dtype=np.float32)
-        
-        # Compute similarity transform
-        result = cv2.estimateAffinePartial2D(
-            landmarks.reshape(-1, 2),
-            reference_landmarks,
-            method=cv2.LMEDS
-        )
-        transform_matrix = result[0] if result is not None else None
-        
-        if transform_matrix is None:
-            # Fallback: just crop the bounding box
+            landmarks = np.ascontiguousarray(landmarks.reshape(-1, 2))
+        except Exception:
             x1, y1, x2, y2 = map(int, bbox)
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(image.shape[1], x2), min(image.shape[0], y2)
             return image[y1:y2, x1:x2]
         
-        # Apply transformation
+        reference_landmarks = np.ascontiguousarray(reference_landmarks)
+        
+        try:
+            result = cv2.estimateAffinePartial2D(
+                landmarks,
+                reference_landmarks,
+                method=cv2.LMEDS
+            )
+            transform_matrix = result[0] if result is not None else None
+        except Exception:
+            transform_matrix = None
+        
+        if transform_matrix is None:
+            x1, y1, x2, y2 = map(int, bbox)
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(image.shape[1], x2), min(image.shape[0], y2)
+            return image[y1:y2, x1:x2]
+        
         aligned_face = cv2.warpAffine(
             image,
             transform_matrix,
